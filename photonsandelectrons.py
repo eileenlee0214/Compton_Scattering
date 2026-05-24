@@ -55,7 +55,7 @@ for i in range(5):
     electrons.append(e)
     
 for i in range(5):
-    e = electron(vec(i + 5, 2*(i), 0), 0, 0)
+    e = electron(vec(i + 5, 2*(i)+0.4, 0), 0, 0)
     e.create_electron()
     electrons.append(e)
             
@@ -63,11 +63,7 @@ photons = []
 for i in range(10):
     p = photon(0.04 * i, 2*(i - 5))
     p.create_photon()
-    photons.append(p)
-    
-    
-
-    
+    photons.append(p)   
     
 n = 0
 while True:
@@ -76,7 +72,7 @@ while True:
         phot.photon_step(n)
         for elect in electrons:
             distance = ((phot.center - elect.sphere.pos.x)**2 + (phot.y - elect.sphere.pos.y)**2)**0.5
-            if distance < elect.sphere.radius - 40 * dl:
+            if distance < elect.sphere.radius :
                 phot.curv.clear()
       
     n+=1
