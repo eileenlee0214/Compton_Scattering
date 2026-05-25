@@ -64,10 +64,9 @@ class photon:
         
         
 class electron:
-    def __init__(self, position, vel, phi):
+    def __init__(self, position, vel):
         self.position = position
         self.vel = vel
-        self.phi = phi
         self.hit = vec(1,0,0)
         
     def create_electron(self):
@@ -143,7 +142,7 @@ def run():
         for phot in photons:
             phot.photon_step()
             for elect in electrons:
-                distance = mag(phot.pos - elect.sphere.pos)  
+                distance = mag(phot.pos + phot.dir - elect.sphere.pos)  
                 if distance < elect.sphere.radius: #detect collision with electron
                     in_dir = phot.dir
                     phot.theta = angles * pi / 180
@@ -151,10 +150,9 @@ def run():
                     out_dir = phot.dir
                     elect.collision(in_dir, out_dir, phot.E_i, phot.E_f)
                     phot.localtime = 0
-                    phot.ipos = elect.sphere.pos + phot.dir 
+                    phot.ipos = elect.sphere.pos + phot.dir # so we don't get repeated collisions we start it a little forward
                     phot.pos = vec(phot.ipos.x, phot.ipos.y, 0)
                     elect.vel = phot.v_e
-                    #elect.find_phi(phot.theta, phot.E_i)
                     phot.freq = c / phot.lambda_f
         for elec in electrons:
             elec.electron_step() 
