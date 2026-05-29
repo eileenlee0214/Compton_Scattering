@@ -11,11 +11,40 @@ freq = 10
 dl = 0.01
 dt = 0.01
 
+sum_K = 0
+sum_Ei_curr = 0
+init_Ei = 0
+
 #for modeling purposes and simplicity, these constants will be set to 1
 c = 1 #speed of light
 m = 1 #electron mass
 h = 1 #planks constant
 r = 1 # electron radius
+
+energy_graph = graph(
+    title = 'Conservation of Energy (E = hf)',
+    xtitle = '???',
+    ytitle = 'Energy (hf)',
+    width = 450,
+    height = 300,
+    xmin = 0, xmax = 5,
+    ymin = 0, ymax = 2,
+    align = 'right'
+)
+
+bar_Ei   = gvbars(graph=energy_graph, delta=0.5, color=color.magenta,  label='E_i of photon')
+bar_Ef   = gvbars(graph=energy_graph, delta=0.5, color=color.purple,  label='E_f of photon')
+bar_Ke   = gvbars(graph=energy_graph, delta=0.5, color=color.cyan,    label='K of electron')
+bar_Etot = gvbars(graph=energy_graph, delta=0.5, color=color.blue,   label='check')
+
+def update_energy_graph(E_i, E_f, K):
+    bar_Ei.plot(1, E_i)
+    bar_Ef.plot(2, E_f)
+    bar_Ke.plot(3, K)
+    bar_Etot.plot(4, E_f + K) # should be equal to E_i ?
+    energy_graph.ymax = max(E_i, E_f + K) * 1.3
+
+update_energy_graph(h * (c / (c/freq)), 0, 0)
 
 #wave packet form
 def dsine(x, freq, phase, dis):
@@ -147,6 +176,9 @@ def reset():
     global restart
     global photons
     global electrons
+    global sum_K
+    global sum_Ei_curr
+    global init_Ei 
     restart = True
     n = 0
     for phot in photons:
@@ -158,6 +190,16 @@ def reset():
         elect.sphere.visible = False
         del elect
     electrons = []
+    
+    sum_K = 0
+    sum_Ei_curr = 0
+    init_Ei = 0
+    
+    bar_Ei.data   = []
+    bar_Ef.data   = []
+    bar_Ke.data   = []
+    bar_Etot.data = []
+    update_energy_graph(h * (c / (c/freq)), 0, 0)
         
 def pauser():
     global paused
@@ -165,6 +207,9 @@ def pauser():
 
 def run():
     global paused
+    global sum_K
+    global sum_Ei_curr
+    global init_Ei
     paused = False
     while True:
         rate(1000)
@@ -177,9 +222,19 @@ def run():
                     #store incoming direction, change angle based on distribution, 
                     #store outgoing direction and update energy and wavelength
                     in_dir = phot.dir
+                    
+                    if init_Ei == 0:    # keep track of initial photon Ei if its first
+                        init_Ei = phot.E_i
+                    
                     phot.theta = kn_rejacc(phot.E_i)
                     phot.collision()
                     out_dir = phot.dir
+                    
+                    sum_K += phot.K
+                    sum_Ei_curr = phot.E_f # keep track of all affected electrons
+
+                    
+                    update_energy_graph(init_Ei, sum_Ei_curr, sum_K)
                    
                     #calculate electrons momentum from photon's momentum 
                     #then update the photon's internal time and initial position
