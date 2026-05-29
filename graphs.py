@@ -18,6 +18,31 @@ m = 1 #electron mass
 h = 1 #planks constant
 r = 1 # electron radius
 
+energy_graph = graph(
+    title = 'Conservation of Energy (E = hf)',
+    xtitle = '???',
+    ytitle = 'Energy (hf)',
+    width = 450,
+    height = 300,
+    xmin = 0, xmax = 5,
+    ymin = 0, ymax = 2,
+    align = 'right'
+)
+
+bar_Ei   = gvbars(graph=energy_graph, delta=0.5, color=color.magenta,  label='E_i of photon')
+bar_Ef   = gvbars(graph=energy_graph, delta=0.5, color=color.purple,  label='E_f of photon')
+bar_Ke   = gvbars(graph=energy_graph, delta=0.5, color=color.cyan,    label='K of electron')
+bar_Etot = gvbars(graph=energy_graph, delta=0.5, color=color.blue,   label='check')
+
+def update_energy_graph(E_i, E_f, K):
+    bar_Ei.plot(1, E_i)
+    bar_Ef.plot(2, E_f)
+    bar_Ke.plot(3, K)
+    bar_Etot.plot(4, E_f + K) # should be equal to E_i ?
+    energy_graph.ymax = max(E_i, E_f + K) * 1.3
+
+update_energy_graph(h * (c / (c/freq)), 0, 0)
+
 #wave packet form
 def dsine(x, freq, phase, dis):
     return exp(-(x**2)) * sin(freq * (x - dis + phase))
@@ -167,6 +192,12 @@ def reset():
         elect.sphere.visible = False
         del elect
     electrons = []
+    
+    bar_Ei.data   = []
+    bar_Ef.data   = []
+    bar_Ke.data   = []
+    bar_Etot.data = []
+    update_energy_graph(h * (c / (c/freq)), 0, 0)
         
 def pauser():
     global paused
@@ -189,6 +220,8 @@ def run():
                     phot.theta = angles * pi / 180
                     phot.collision()
                     out_dir = phot.dir
+                    
+                    update_energy_graph(phot.E_i, phot.E_f, phot.K)
                    
                     #calculate electrons momentum from photon's momentum 
                     #then update the photon's internal time and initial position
