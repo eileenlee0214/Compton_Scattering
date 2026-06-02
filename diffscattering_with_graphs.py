@@ -176,6 +176,17 @@ class electron:
         p_f = E_f / c * norm(out_dir)
         p_e = p_i - p_f
         self.p += p_e 
+        
+    def elec_collision(self, other):
+        global attached_vec
+        if attached_vec:
+            print(self.sphere.momentum)
+        n = norm(self.sphere.pos - other.sphere.pos) #normal vector
+        p_self_n = dot(self.p, n)
+        p_other_n = dot(other.p, n)
+        J = 0.5 * 2 * (m * p_self_n - m * p_other_n) / (m + m) * n #impulse along normal vector, divided by two since double counted (SHOULD FIX)
+        self.p -= J
+        other.p += J
  
 #making electrons
 electrons = []
@@ -302,8 +313,12 @@ def run():
                     phot.ipos = elect.sphere.pos + phot.dir # so we don't get repeated collisions we start it a little forward
                     phot.pos = vec(phot.ipos.x, phot.ipos.y, 0)
                     phot.E_i = h * phot.freq
-        for elec in electrons:
-            elec.electron_step() 
+        for self in electrons:
+            for other in electrons:
+                if other is not self:
+                    if mag(other.sphere.pos - self.sphere.pos) < 2 * self.sphere.radius:
+                        self.elec_collision(other)
+            self.electron_step()  
         if restart == True:
             restart = False
             break
