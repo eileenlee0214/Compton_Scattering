@@ -20,6 +20,15 @@ m = 1 #electron mass
 h = 1 #planks constant
 r = 1 # electron radius
 
+freq_min = 0.001
+freq_max = 200
+
+def linear_to_log_freq(t):
+    return freq_min * (freq_max / freq_min) ** t
+
+def log_to_linear_freq(f):
+    return log(f / freq_min) / log(freq_max / freq_min)
+
 NM_SCALE = 1
 
 GAMMA_THRESHOLD = 0.01
@@ -232,11 +241,17 @@ for i in range(10):
 start = button(bind = run, text = 'run')
 reset = button(bind = reset, text = 'reset')
 pause = button(bind = pauser, text = 'pause')
-frequency = slider(bind = change_freq, min = 1, max = 20, step = 1, value = freq)
-frequency_text = wtext(text = f'{freq}\n')
+frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.001, value = log_to_linear_freq(freq))
+frequency_text = wtext(text = f'{freq:.4f}\n')
 click_text = wtext(text='Click on the canvas to place electrons, and then run')
 wl_label = wtext(text='')
 update_wl_label(c/freq)
+
+def change_freq(evt):
+    global freq
+    freq = linear_to_log_freq(evt.value)
+    frequency_text.text = f'{freq:.4f}\n'
+    update_wl_label(c/freq)
 
 # checkbox, set mode
 
