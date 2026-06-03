@@ -1,12 +1,13 @@
 Web VPython 3.2
 
+scene.userzoom = False
 scene.range = 10
 scene.autoscale = False
 scene.userspin = False
 
 restart = False
 paused = False
-freq = 10
+freq = 1.0
 
 dl = 0.01
 dt = 0.01
@@ -14,20 +15,48 @@ dt = 0.01
 init_Ei = 0
 init_iM = 0
 
+DISPLAY_FREQ_MIN = 1
+DISPLAY_FREQ_MAX = 20
+
 #for modeling purposes and simplicity, these constants will be set to 1
 c = 1 #speed of light
 m = 1 #electron mass
 h = 1 #planks constant
 r = 1 # electron radius
 
-freq_min = 0.001
-freq_max = 200
+b0_min = 0.00043;  b0_max = 0.00143
+b1_min = 0.00143;  b1_max = 0.00300
+b2_min = 0.00300;  b2_max = 0.100
+b3_min = 0.100;    b3_max = 100.0
+b4_min = 100.0;    b4_max = 30000.0
 
 def linear_to_log_freq(t):
-    return freq_min * (freq_max / freq_min) ** t
+    if t < 0.2:
+        return b0_min * pow(b0_max / b0_min, t / 0.2)
+    elif t < 0.4:
+        return b1_min * pow(b1_max / b1_min, (t - 0.2) / 0.2)
+    elif t < 0.6:
+        return b2_min * pow(b2_max / b2_min, (t - 0.4) / 0.2)
+    elif t < 0.8:
+        return b3_min * pow(b3_max / b3_min, (t - 0.6) / 0.2)
+    else:
+        return b4_min * pow(b4_max / b4_min, (t - 0.8) / 0.2)
 
 def log_to_linear_freq(f):
-    return log(f / freq_min) / log(freq_max / freq_min)
+    if f >= b0_min and f <= b0_max:
+        return 0.2 * log(f / b0_min) / log(b0_max / b0_min)
+    elif f > b0_max and f <= b1_max:
+        return 0.2 + 0.2 * log(f / b1_min) / log(b1_max / b1_min)
+    elif f > b1_max and f <= b2_max:
+        return 0.4 + 0.2 * log(f / b2_min) / log(b2_max / b2_min)
+    elif f > b2_max and f <= b3_max:
+        return 0.6 + 0.2 * log(f / b3_min) / log(b3_max / b3_min)
+    else:
+        return 0.8 + 0.2 * log(f / b4_min) / log(b4_max / b4_min)
+
+def physical_to_display_freq(f):
+    t = log_to_linear_freq(f)
+    return DISPLAY_FREQ_MIN + t * (DISPLAY_FREQ_MAX - DISPLAY_FREQ_MIN)
 
 NM_SCALE = 1
 
@@ -47,6 +76,24 @@ def classify_photon(wl_nm):
         return 'Visible'
     else:
         return 'Infrared'
+
+def freq_to_color(f):
+    t = log_to_linear_freq(f)
+    if t < 0.2:
+        s = t / 0.2
+        return vec(0.6, s * 0.2, 0)
+    elif t < 0.4:
+        s = (t - 0.2) / 0.2
+        return vec(1-s, 0, s)
+    elif t < 0.6:
+        s = (t - 0.4) / 0.2
+        return vec(0.5 - s * 0.5, 0, 1)
+    elif t < 0.8:
+        s = (t - 0.6) / 0.2
+        return vec(s, s, 1)
+    else:
+        s = (t - 0.8) / 0.2
+        return vec(1, 1, 1)
 
 energy_graph = graph(
     title = 'Conservation of Energy (E = hf)',
@@ -69,7 +116,7 @@ def update_energy_graph(E_i, E_f, K):
     bar_Ef.plot(2, E_f)
     bar_Ke.plot(3, K)
     bar_Etot.plot(4, E_f + K) # should be equal to E_i ?
-    energy_graph.ymax = max(E_i, E_f, K, E_f + K) * 1.5
+    energy_graph.ymax = max(E_i, E_f, K, E_f + K) * 1.7
 
 update_energy_graph(h * freq, 0, 0)
 
@@ -96,7 +143,7 @@ def update_momenta_graph(iM, fM, eM):
     bar_fM.plot(2, fM)
     bar_eM.plot(3, eM)
     bar_Mtot.plot(4, fM + eM) # should be equal to iM ?
-    top = max(abs(iM), abs(fM), abs(eM), abs(fM + eM)) * 1.5
+    top = max(abs(iM), abs(fM), abs(eM), abs(fM + eM)) * 1.7
     momenta_graph.ymax = top
     momenta_graph.ymin = 0
 
@@ -152,6 +199,8 @@ class photon:
         self.ipos = ipos #initial position
         self.localtime = 0 #since photons travel in a straight line from initial position, local time must be reset after every collision
         self.freq = c / wlength
+        self.display_freq = physical_to_display_freq(self.freq)
+        self.color = freq_to_color(self.freq)
         self.dir = rotate(vec(1,0,0), angle = self.theta, axis = vec(0,0,1))
         self.E_i = h * self.freq
         self.iM = h / self.wlength
@@ -164,20 +213,20 @@ class photon:
         self.init_iM = 0
 
     def create_photon(self): #create photons based on initial angle and displacement
-        self.curv = curve(color=vec(1-self.freq / 20,0,self.freq / 20))
+        self.curv = curve(color=self.color)
         for i in range(400):
             dx = (i - 200) * dl
-            y = dsine(dx, self.freq, 0, self.ipos.x)
+            y = dsine(dx, self.display_freq, 0, self.ipos.x)
             rotated = rotate(vec(dx, y, 0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
             self.curv.append(pos = rotated + self.ipos)
         self.pos = vec(self.ipos.x, self.ipos.y, 0)
 
     def photon_step(self):
         for i in range(self.curv.npoints):
-            self.curv.color = vec(1-self.freq / 20,0,self.freq / 20)
+            self.curv.color = self.color
             dx = (i - 200) * dl
             t = self.localtime * c
-            y = dsine(dx, self.freq, t, 0)
+            y = dsine(dx, self.display_freq, t, 0)
             rotated = rotate(vec(dx + t, y, 0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
             self.curv.modify(i, pos = rotated + self.ipos)
         self.localtime += dt
@@ -188,6 +237,8 @@ class photon:
         self.K = self.E_i - self.E_f
         self.wlength += h /(m*c) * (1 - cos(self.theta))
         self.freq = c / self.wlength
+        self.display_freq = physical_to_display_freq(self.freq)
+        self.color = freq_to_color(self.freq)
         self.M = h / (self.wlength)
         self.dir = rotate(self.dir, angle = self.theta, axis = vec(0,0,1))
         self.localtime = 0
@@ -241,24 +292,18 @@ for i in range(10):
 start = button(bind = run, text = 'run')
 reset = button(bind = reset, text = 'reset')
 pause = button(bind = pauser, text = 'pause')
-frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.001, value = log_to_linear_freq(freq))
+frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.0001, value = log_to_linear_freq(freq))
 frequency_text = wtext(text = f'{freq:.4f}\n')
 click_text = wtext(text='Click on the canvas to place electrons, and then run')
 wl_label = wtext(text='')
 update_wl_label(c/freq)
 
-def change_freq(evt):
-    global freq
-    freq = linear_to_log_freq(evt.value)
-    frequency_text.text = f'{freq:.4f}\n'
-    update_wl_label(c/freq)
-
 # checkbox, set mode
 
 def change_freq(evt):
     global freq
-    freq = evt.value
-    frequency_text.text = f'{freq}\n'
+    freq = linear_to_log_freq(evt.value)
+    frequency_text.text = f'{freq:.4f}\n'
     update_wl_label(c/freq)
 
 def reset():
@@ -315,7 +360,7 @@ def run():
                         phot.init_iM = phot.iM
                         phot.init_Ei_set = True
                         phot.init_iM_set = True
-                        
+
                     pre_collision_M = h / phot.wlength
                     pre_collision_dir = vec(phot.dir.x, phot.dir.y, 0)
 
@@ -324,11 +369,11 @@ def run():
                     out_dir = phot.dir
 
                     phot.sum_K += phot.K
-                    
+
                     p_i_vec = pre_collision_M * norm(pre_collision_dir)
                     p_f_vec = phot.M * norm(out_dir)
                     p_e_vec = p_i_vec - p_f_vec
-                    
+
                     phot.sum_eM_x += p_e_vec.x
                     phot.sum_M_curr_x = p_f_vec.x # keep track of all affected electrons
 
