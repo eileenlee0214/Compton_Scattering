@@ -60,15 +60,16 @@ def update_energy_graph(E_i, E_f, K):
     bar_Ef.plot(2, E_f)
     bar_Ke.plot(3, K)
     bar_Etot.plot(4, E_f + K) # should be equal to E_i ?
-    energy_graph.ymax = max(E_i, E_f + K) * 1.5
+    energy_graph.ymax = max(E_i, E_f, K, E_f + K) * 1.5
 
 update_energy_graph(h * freq, 0, 0)
 
 #===== momentum graph
+## do i also add y dir momentum ?
 momenta_graph = graph(
     title = 'Momentum',
     xtitle = '???',
-    ytitle = 'momenta',
+    ytitle = 'x-direction momenta',
     width = 450,
     height = 300,
     xmin = 0, xmax = 5,
@@ -86,9 +87,9 @@ def update_momenta_graph(iM, fM, eM):
     bar_fM.plot(2, fM)
     bar_eM.plot(3, eM)
     bar_Mtot.plot(4, fM + eM) # should be equal to iM ?
-    top = max(abs(iM), abs(fM + eM)) * 1.5
+    top = max(abs(iM), abs(fM), abs(eM), abs(fM + eM)) * 1.5
     momenta_graph.ymax = top
-    momenta_graph.ymin = -top * 0.3
+    momenta_graph.ymin = 0
 
 update_momenta_graph(h * freq, 0, 0)
 
@@ -146,8 +147,8 @@ class photon:
         self.E_i = h * self.freq
         self.iM = h / self.wlength
         self.sum_K = 0
-        self.sum_eM = 0
-        self.sum_M_curr = 0
+        self.sum_eM_x = 0
+        self.sum_M_curr_x = 0
         self.init_Ei_set = False
         self.init_iM_set = False
         self.init_Ei = 0
@@ -179,7 +180,6 @@ class photon:
         self.wlength += h /(m*c) * (1 - cos(self.theta))
         self.freq = c / self.wlength
         self.M = h / (self.wlength)
-        self.fM_x = self.M * cos(self.theta)
         self.dir = rotate(self.dir, angle = self.theta, axis = vec(0,0,1))
         self.localtime = 0
 
@@ -300,17 +300,25 @@ def run():
                         phot.init_iM = phot.iM
                         phot.init_Ei_set = True
                         phot.init_iM_set = True
+                        
+                    pre_collision_M = h / phot.wlength
+                    pre_collision_dir = vec(phot.dir.x, phot.dir.y, 0)
 
                     phot.theta = kn_rejacc(phot.E_i)
                     phot.collision()
                     out_dir = phot.dir
 
                     phot.sum_K += phot.K
-                    phot.sum_eM += (phot.iM - phot.fM_x)
-                    phot.sum_M_curr = phot.fM_x # keep track of all affected electrons
+                    
+                    p_i_vec = pre_collision_M * norm(pre_collision_dir)
+                    p_f_vec = phot.M * norm(out_dir)
+                    p_e_vec = p_i_vec - p_f_vec
+                    
+                    phot.sum_eM_x += p_e_vec.x
+                    phot.sum_M_curr_x = p_f_vec.x # keep track of all affected electrons
 
                     update_energy_graph(phot.init_Ei, phot.E_f, phot.sum_K)
-                    update_momenta_graph(phot.init_iM, phot.sum_M_curr, phot.sum_eM)
+                    update_momenta_graph(phot.init_iM, phot.sum_M_curr_x, phot.sum_eM_x)
                     update_wl_label(phot.wlength)
 
                     #calculate electrons momentum from photon's momentum
