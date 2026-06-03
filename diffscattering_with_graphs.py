@@ -24,11 +24,18 @@ m = 1 #electron mass
 h = 1 #planks constant
 r = 1 # electron radius
 
-b0_min = 0.00043;  b0_max = 0.00143
-b1_min = 0.00143;  b1_max = 0.00300
-b2_min = 0.00300;  b2_max = 0.100
-b3_min = 0.100;    b3_max = 100.0
-b4_min = 100.0;    b4_max = 30000.0
+b0_min = 0.00043;  b0_max = 0.00143 # infrared
+b1_min = 0.00143;  b1_max = 0.00300 # visible
+b2_min = 0.00300;  b2_max = 0.100 # ultraviolet
+b3_min = 0.100;    b3_max = 100.0 # x ray
+b4_min = 100.0;    b4_max = 30000.0 # gamma ray
+
+## okay so i need to account for the photoelectric effect. 
+# 13.6 eV for hydrogen atom
+
+## pair production: 2.044 MeV
+## add (M) eV displayer: hc / E = lambda for photons
+
 
 def linear_to_log_freq(t):
     if t < 0.2:

@@ -187,25 +187,36 @@ def kn_rejacc(Ei): #rejection acceptance method since the pdf is univertible
 
 
 # Hydrogen atom: single shell (n=1)
-a0 = 2.0
+a0 = 2.0 # in reality: 5.292 * pow(10, -11)
 
 def bohr_radius(n):
     return a0 * n * n
 
 def orbital_speed(n):
-    return 1.0 / n
+    return 1.0 / n # inaccurate but whatever, figure out later
 
 nucleus = sphere(pos=vec(0,0,0), radius=0.4, color=color.red, emissive=True)
 
 # Draw only the n=1 orbital ring
-ring_r = bohr_radius(1)
+ring_r1 = bohr_radius(1)
 pts = []
 n_pts = 100
 for k in range(n_pts + 1):
     angle_k = 2 * pi * k / n_pts
-    pts.append(vec(ring_r * cos(angle_k), ring_r * sin(angle_k), 0))
+    pts.append(vec(ring_r1 * cos(angle_k), ring_r1 * sin(angle_k), 0))
 c_ring = curve(color=vec(0.3, 0.3, 0.3))
 for pt in pts:
+    c_ring.append(pos=pt)
+    
+# all other orbital rings are dotted, but cant get them to work
+ring_r2 = bohr_radius(2)
+pts2 = []
+n_pts2 = 100
+for k in range(n_pts2 + 1):
+    angle_k2 = 2 * pi * k / n_pts2
+    pts.append(vec(ring_r2 * cos(angle_k2), ring_r2 * sin(angle_k2), 0))
+c_ring = curve(color=vec(0.3, 0.3, 0.3))
+for pt in pts2:
     c_ring.append(pos=pt)
 
 class orbital_electron:
@@ -287,7 +298,7 @@ class photon:
         self.localtime += dt
         self.pos += rotate(vec(1,0,0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1)) * dt
 
-    def collision(self):
+    def collision(self): # so why is the collision not working ?!!?!
         self.E_f = self.E_i / (1 + (self.E_i / (m * c**2)) * (1-cos(self.theta)))
         self.K = self.E_i - self.E_f
         self.wlength += h /(m*c) * (1 - cos(self.theta))
