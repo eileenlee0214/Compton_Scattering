@@ -12,6 +12,13 @@ freq = 1.0
 dl = 0.01
 dt = 0.01
 
+## do add stuff like user choosing the proton's locations
+## give them option to choose of keep the current configuration
+## pop electron function
+## histogram
+## UI
+## if electrons overlaps by a certain amount, make it impossible to place it there
+
 init_Ei = 0
 init_iM = 0
 
@@ -104,7 +111,7 @@ def freq_to_color(f):
 
 energy_graph = graph(
     title = 'Conservation of Energy (E = hf)',
-    xtitle = '???',
+    xtitle = 'Bar Graphs',
     ytitle = 'Energy (hf)',
     width = 450,
     height = 300,
@@ -131,7 +138,7 @@ update_energy_graph(h * freq, 0, 0)
 ## do i also add y dir momentum ?
 momenta_graph = graph(
     title = 'Momentum',
-    xtitle = '???',
+    xtitle = 'Bar Graphs',
     ytitle = 'x-direction momenta',
     width = 450,
     height = 300,
@@ -250,19 +257,30 @@ class photon:
         self.dir = rotate(self.dir, angle = self.theta, axis = vec(0,0,1))
         self.localtime = 0
 
-
 class electron:
     def __init__(self, position):
         self.position = position
         self.p = vec(0,0,0) #initial momentum
 
     def create_electron(self):
-        self.sphere = sphere(pos=self.position, radius=1, color=color.cyan)
-        return self.sphere
+        self.sphere = sphere(pos=self.position, radius=1, color=color.cyan, momentum = self.p)
+        self.momentum_arrow = attach_arrow(self.sphere, 'momentum', scale = 0.5, shaftwidth = self.sphere.radius / 3)#momentum vectors!
+        if attached_vec:
+            self.momentum_arrow.start()
+        else: 
+            self.momentum_arrow.stop()
 
+    ## WHY DOES MOMENTUM VECTOR NOT WORK GRRRRRR
     def electron_step(self):
+        self.sphere.momentum = self.p
+        global attached_vec
+        if attached_vec:
+            self.momentum_arrow.start()
+        else: 
+            self.momentum_arrow.stop()
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
+        #print(self.sphere.momentum)
 
     def collision(self, in_dir, out_dir, E_i, E_f): #electron direction from conservation of momentum
         p_i = E_i / c * norm(in_dir)
@@ -277,9 +295,49 @@ class electron:
         J = 0.5 * 2 * (m * p_self_n - m * p_other_n) / (m + m) * n #impulse along normal vector, divided by two since double counted (SHOULD FIX)
         self.p -= J
         other.p += J
+        
+class positron:
+    def __init__(self, position):
+        self.position = position
+        self.p = vec(0,0,0) #initial momentum
+
+    def create_positron(self):
+        self.sphere = sphere(pos=self.position, radius=1, color=color.red, momentum = self.p)
+        self.momentum_arrow = attach_arrow(self.sphere, 'momentum', scale = 0.5, shaftwidth = self.sphere.radius / 3)#momentum vectors!
+        if attached_vec:
+            self.momentum_arrow.start()
+        else: 
+            self.momentum_arrow.stop()
+
+    ## WHY DOES MOMENTUM VECTOR NOT WORK GRRRRRR
+    def positron_step(self):
+        self.sphere.momentum = self.p
+        global attached_vec
+        if attached_vec:
+            self.momentum_arrow.start()
+        else: 
+            self.momentum_arrow.stop()
+        if mag(self.p) != 0:
+            self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
+        #print(self.sphere.momentum)
+
+    def collision(self, in_dir, out_dir, E_i, E_f): #positron direction from conservation of momentum
+        p_i = E_i / c * norm(in_dir)
+        p_f = E_f / c * norm(out_dir)
+        p_e = p_i - p_f
+        self.p += p_e
+
+    def posi_collision(self, other):
+        n = norm(self.sphere.pos - other.sphere.pos) #normal vector
+        p_self_n = dot(self.p, n)
+        p_other_n = dot(other.p, n)
+        J = 0.5 * 2 * (m * p_self_n - m * p_other_n) / (m + m) * n #impulse along normal vector, divided by two since double counted (SHOULD FIX)
+        self.p -= J
+        other.p += J
 
 #making electrons
 electrons = []
+positrons = []
 
 scene.bind('click', click_electron)
 
@@ -299,11 +357,14 @@ for i in range(10):
 start = button(bind = run, text = 'run')
 reset = button(bind = reset, text = 'reset')
 pause = button(bind = pauser, text = 'pause')
+spacer = wtext(text='\n')
 frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.0001, value = log_to_linear_freq(freq))
 frequency_text = wtext(text = f'{freq:.4f}\n')
 click_text = wtext(text='Click on the canvas to place electrons, and then run')
 wl_label = wtext(text='')
 update_wl_label(c/freq)
+wtext(text = 'Attach Momentum Vectors')
+attach_vec_checkbox = checkbox(bind = attach_vec) 
 
 # checkbox, set mode
 
@@ -316,6 +377,7 @@ def change_freq(evt):
 def reset():
     global restart, photons, electrons, init_Ei, init_iM
     restart = True
+    running = False
     n = 0
     for phot in photons:
         phot.curv.clear()
@@ -324,6 +386,7 @@ def reset():
         n += 1
     for elect in electrons:
         elect.sphere.visible = False
+        elect.momentum_arrow.stop()
         del elect
     electrons = []
 
@@ -346,6 +409,13 @@ def reset():
 def pauser():
     global paused
     paused = True
+    
+def attach_vec(evt):
+    global attached_vec
+    if evt.checked:
+        attached_vec = True
+    else: 
+        attached_vec = False
 
 def run():
     global paused
