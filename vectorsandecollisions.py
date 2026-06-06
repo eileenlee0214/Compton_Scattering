@@ -3,9 +3,14 @@ Web VPython 3.2
 scene.range = 10
 scene.autoscale = False
 scene.userspin = False
+scene.userzoom = False
 
 restart = False
 paused = False
+running = False
+
+attached_vec = False
+
 freq = 10
 angles = 67
 
@@ -47,11 +52,11 @@ def kn_rejacc(Ei): #rejection acceptance method since the pdf is univertible
     while sampley > diff_cross(samplex) / env:
         samplex = random() * 2 - 1
         sampley = random()
-#    if random() > 0.5:
-#        return -acos(samplex)
-#    else: 
-#        return -acos(samplex)
-    return acos(samplex)
+    if random() > 0.5:
+        return -acos(samplex)
+    else: 
+        return acos(samplex)
+#    return acos(samplex)
     
     
 
@@ -94,25 +99,35 @@ class photon:
         self.localtime = 0
         
         
+        
 class electron:
     def __init__(self, position):
         self.position = position
         self.p = vec(0,0,0) #initial momentum
         
     def create_electron(self):
-        self.sphere = sphere(pos=self.position, radius=1, color=color.cyan)
-        return self.sphere
+        self.sphere = sphere(pos=self.position, radius=1, color=color.cyan, momentum = self.p)
+        self.momentum_arrow = attach_arrow(self.sphere, 'momentum', scale = 1, shaftwidth = self.sphere.radius / 3)#momentum vectors!
+        if attached_vec:
+            self.momentum_arrow.start()
+        else: 
+            self.momentum_arrow.stop()
         
     def electron_step(self):
+        self.sphere.momentum = self.p
+        global attached_vec
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
-            
+        
     def collision(self, in_dir, out_dir, E_i, E_f): #electron direction from conservation of momentum
         p_i = E_i / c * norm(in_dir)
         p_f = E_f / c * norm(out_dir)
         p_e = p_i - p_f
-        self.p += p_e 
+        self.p += p_e
+        if attached_vec: 
+            self.momentum_arrow.start()
         
+            
     def elec_collision(self, other):
         n = norm(self.sphere.pos - other.sphere.pos) #normal vector
         p_self_n = dot(self.p, n)
@@ -122,6 +137,7 @@ class electron:
         other.p += J
         
         
+        
  
 #making electrons
 electrons = []
@@ -129,9 +145,14 @@ electrons = []
 scene.bind('click', click_electron)
 
 def click_electron(evt):
-    e = electron(vec(evt.pos.x, evt.pos.y, 0))
-    e.create_electron()
-    electrons.append(e)
+    inside = False
+    for elect in electrons:
+        if mag(evt.pos - elect.sphere.pos) < 1.8 * elect.sphere.radius:
+            inside = True
+    if inside == False:
+        e = electron(vec(evt.pos.x, evt.pos.y, 0))
+        e.create_electron()
+        electrons.append(e)
 
 
 #making test photons
@@ -142,15 +163,16 @@ photons.append(p)
         
 # widgets
 start = button(bind = run, text = 'run')
-reset = button(bind = reset, text = 'reset')
+resets = button(bind = reset, text = 'reset')
 pause = button(bind = pauser, text = 'pause')
 spacer = wtext(text='\n')
 angle = slider(bind = change_angle, min = 0, max = 180, step = 1, value = angles)
 angle_text = wtext(text=f'Angle:{angles}\n')  
 frequency = slider(bind = change_freq, min = 1, max = 20, step = 1, value = freq)
 frequency_text = wtext(text = f'Frequency:{freq}\n')
-click_text = wtext(text='Click on the canvas to place electrons, and then run')
-  
+click_text = wtext(text='Click on the canvas to place electrons, and then run\n')
+wtext(text = 'Attach Momentum Vectors')
+attach_vec_checkbox = checkbox(bind = attach_vec)  
 
 def change_angle(evt):
     global angles 
@@ -162,11 +184,24 @@ def change_freq(evt):
     freq = evt.value
     frequency_text.text = f'Frequency:{freq}\n'
     
+def attach_vec(evt):
+    global attached_vec
+    global electrons
+    if evt.checked:
+        attached_vec = True
+        for electron in electrons:
+            electron.momentum_arrow.start()
+    else: 
+        attached_vec = False 
+        for electron in electrons:
+            electron.momentum_arrow.stop()
+    
 def reset():
     global restart
     global photons
     global electrons
     restart = True
+    running = False
     n = 0
     for phot in photons:
         phot.curv.clear()
@@ -175,7 +210,7 @@ def reset():
         n+=1
     for elect in electrons:
         elect.sphere.visible = False
-        del elect
+        elect.momentum_arrow.stop()
     electrons = []
         
 def pauser():
@@ -183,7 +218,11 @@ def pauser():
     paused = True
 
 def run():
-    global paused
+    global paused, running
+    if running:
+        return none
+    else: 
+        running = True
     paused = False
     while True:
         rate(1000)
@@ -214,6 +253,10 @@ def run():
             self.electron_step() 
         if restart == True:
             restart = False
+            running = False
             break
         if paused == True:
+            running = False
             break
+        
+    #fixed running and reset and momentum arrows
