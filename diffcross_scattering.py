@@ -3,6 +3,7 @@ Web VPython 3.2
 scene.range = 10
 scene.autoscale = False
 scene.userspin = False
+scene.userzoom = False
 
 restart = False
 paused = False
@@ -46,11 +47,11 @@ def kn_rejacc(Ei): #rejection acceptance method since the pdf is univertible
     while sampley > diff_cross(samplex) / env:
         samplex = random() * 2 - 1
         sampley = random()
-#    if random() > 0.5:
-#        return -acos(samplex)
-#    else: 
-#        return -acos(samplex)
-    return acos(samplex)
+    if random() > 0.5:
+        return -acos(samplex)
+    else: 
+        return acos(samplex)
+#    return acos(samplex)
     
     
 
@@ -63,13 +64,14 @@ class photon:
         self.freq = c / wlength
         self.dir = rotate(vec(1,0,0), angle = self.theta, axis = vec(0,0,1))
         self.E_i = h * self.freq
+        self.sign = 1
     
     def create_photon(self): #create photons based on initial angle and displacement
         self.curv = curve(color=vec(1-self.freq / 20,0,self.freq / 20))
         for i in range(400):
             dx = (i - 200) * dl
             y = dsine(dx, self.freq, 0, self.ipos.x)
-            rotated = rotate(vec(dx, y, 0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
+            rotated = rotate(vec(dx, y, 0), angle = self.sign * diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
             self.curv.append(pos = rotated + self.ipos)
         self.pos = vec(self.ipos.x, self.ipos.y, 0)
 
@@ -79,7 +81,7 @@ class photon:
             dx = (i - 200) * dl
             t = self.localtime * c    
             y = dsine(dx, self.freq, t, 0)
-            rotated = rotate(vec(dx + t, y, 0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
+            rotated = rotate(vec(dx + t, y, 0), angle = self.sign * diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
             self.curv.modify(i, pos = rotated + self.ipos)
         self.localtime += dt
         self.pos += rotate(vec(1,0,0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1)) * dt
@@ -137,6 +139,20 @@ pause = button(bind = pauser, text = 'pause')
 frequency = slider(bind = change_freq, min = 1, max = 20, step = 1, value = freq)
 frequency_text = wtext(text = f'{freq}\n')
 click_text = wtext(text='Click on the canvas to place electrons, and then run')
+
+#graphs
+angle_histogram = graph(
+    title = 'Angle histogram',
+    xtitle = 'angle',
+    ytitle = 'histogram',
+    width = 450,
+    height = 300,
+    xmin = 0, xmax = 180,
+    ymin = 0, ymax = 20,
+    align = 'right')
+    
+#bars
+angle_frequency_bars = [gvbars(graph=energy_graph, delta=0.05, color=color.magenta) for i in len(179)]
     
 def change_freq(evt):
     global freq 
@@ -171,13 +187,14 @@ def run():
         for phot in photons:
             phot.photon_step()
             for elect in electrons:
-                distance_front = mag(phot.pos + phot.dir - elect.sphere.pos)  # detect a little in front of photon
+                distance_front = mag(phot.pos + phot.dir - elect.sphere.pos)  # detect collision a little in front of photon
                 if distance_front < elect.sphere.radius: #detect collision with electron
                     
                     #store incoming direction, change angle based on distribution, 
                     #store outgoing direction and update energy and wavelength
                     in_dir = phot.dir
                     phot.theta = kn_rejacc(phot.E_i)
+                    phot.sign = sign(phot.theta)
                     phot.collision()
                     out_dir = phot.dir
                    
@@ -194,3 +211,6 @@ def run():
             break
         if paused == True:
             break
+
+#fixed the 50 50 scattering
+#now I have to add looping 
