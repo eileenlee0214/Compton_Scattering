@@ -332,28 +332,62 @@ class positron:
         if attached_vec: 
             self.momentum_arrow.start()
 
-#making electrons
+#making electrons, photons, and positrons
 electrons = []
 positrons = []
+photons = []
 
 scene.bind('click', click_electron)
 
 def click_electron(evt):
+    for elect in electrons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < elect.sphere.radius and not paused:
+            elect.sphere.visible = False
+            elect.momentum_arrow.stop()
+    keys = keysdown()
+    if running or 'e' not in keysdown():
+        return None
     inside = False
     for elect in electrons:
-        if mag(evt.pos - elect.sphere.pos) < 1.8 * elect.sphere.radius:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < 1.8 * elect.sphere.radius:
             inside = True
     if inside == False:
         e = electron(vec(evt.pos.x, evt.pos.y, 0))
         e.create_electron()
         electrons.append(e)
+        
+scene.bind('click', click_positron)
 
-#making test photons
-photons = []
-for i in range(10):
-    p = photon(c/freq, vec(-10, 2*(i - 5), 0), 0)
-    p.create_photon()
-    photons.append(p)
+def click_positron(evt):
+    for posi in positrons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - posi.sphere.pos) < posi.sphere.radius and not paused:
+            posi.sphere.visible = False
+            posi.momentum_arrow.stop()
+    keys = keysdown()
+    if running or 'p' in keysdown() or 'a' not in keysdown():
+        return None
+    inside = False
+    for posi in positrons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - posi.sphere.pos) < 1.8 * posi.sphere.radius:
+            inside = True
+    if inside == False:
+        p = positron(vec(evt.pos.x, evt.pos.y, 0))
+        p.create_positron()
+        positrons.append(p)
+        
+scene.bind('click', click_photon)
+
+def click_photon(evt):
+    for phot in photons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - phot.pos) < 1 and not paused:
+            phot.curv.clear()
+    if running:
+        return None
+    keys = keysdown()
+    if 'p' in keys:
+        p = photon(c/freq, vec(evt.pos.x, evt.pos.y, 0), 0)
+        p.create_photon()
+        photons.append(p) 
 
 # widgets
 start = button(bind = run, text = 'run')
@@ -362,8 +396,8 @@ pause = button(bind = pauser, text = 'pause')
 spacer = wtext(text='\n')
 frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.0001, value = log_to_linear_freq(freq))
 frequency_text = wtext(text = f'{freq:.4f}\n')
-click_text = wtext(text='Click on the canvas to place electrons, and then run')
 wl_label = wtext(text='')
+click_text = wtext(text='Hold down e and click on the canvas to place electrons.\nHold down a and click to place positrons.\nHold down p and click to place photons. Then run.\n')
 update_wl_label(c/freq)
 wtext(text = 'Attach Momentum Vectors')
 attach_vec_checkbox = checkbox(bind = attach_vec) 
@@ -377,14 +411,14 @@ def change_freq(evt):
     update_wl_label(c/freq)
 
 def reset():
+    pauser()
     global restart, photons, electrons, init_Ei, init_iM
     restart = True
     running = False
     n = 0
     for phot in photons:
         phot.curv.clear()
-        photons[n] = photon(c/freq, vec(-10, 2*(n - 5), 0), 0)
-        photons[n].create_photon()
+        photons = []
         n += 1
     for elect in electrons:
         elect.sphere.visible = False
@@ -488,3 +522,6 @@ def run():
         if paused == True:
             running = False
             break
+
+
+#consolidated it all and added photons, electrons and positron creation and deletion. Positrons not fully integrated
