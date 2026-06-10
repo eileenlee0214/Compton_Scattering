@@ -1,7 +1,7 @@
 Web VPython 3.2
 
 scene.userzoom = False
-scene.range = 10
+scene.range = 15
 scene.autoscale = False
 scene.userspin = False
 
@@ -15,9 +15,7 @@ freq = 1.0
 dl = 0.01
 dt = 0.01
 
-## do add stuff like user choosing the photon's locations
 ## give them option to choose of keep the current configuration
-## pop electron function
 ## histogram
 ## UI
 
@@ -44,7 +42,7 @@ b4_min = 100.0;    b4_max = 30000.0 # gamma ray
 
 ## pair production: 2.044 MeV
 ## add (M) eV displayer: hc / E = lambda for photons
-
+            
 
 def linear_to_log_freq(t):
     if t < 0.2:
@@ -115,12 +113,14 @@ energy_graph = graph(
     title = 'Conservation of Energy (E = hf)',
     xtitle = 'Bar Graphs',
     ytitle = 'Energy (hf)',
-    width = 450,
+    width = 400,
     height = 300,
-    xmin = 0, xmax = 6,
+    xmin = 0, xmax = 4.5,
     ymin = 0, ymax = 7,
     align = 'right'
 )
+
+
 
 bar_Ei   = gvbars(graph=energy_graph, delta=0.5, color=color.magenta, label='initial energy of photon')
 bar_Ef   = gvbars(graph=energy_graph, delta=0.5, color=color.purple,  label='final energy of photon')
@@ -142,7 +142,7 @@ momenta_graph = graph(
     title = 'Momentum',
     xtitle = 'Bar Graphs',
     ytitle = 'x-direction momenta',
-    width = 450,
+    width = 400,
     height = 300,
     xmin = 0, xmax = 5,
     ymin = -2, ymax = 2,
@@ -205,7 +205,7 @@ def kn_rejacc(Ei): #rejection acceptance method since the pdf is univertible
         return -acos(samplex)
     else: 
         return acos(samplex)
-
+        
 class photon:
     def __init__(self, wlength, ipos, theta):
         self.wlength = wlength
@@ -266,7 +266,7 @@ class electron:
 
     def create_electron(self):
         self.sphere = sphere(pos=self.position, radius=1, color=color.cyan, momentum = self.p)
-        self.momentum_arrow = attach_arrow(self.sphere, 'momentum', scale = 0.5, shaftwidth = self.sphere.radius / 3)#momentum vectors!
+        self.momentum_arrow = attach_arrow(self.sphere, 'momentum', scale = 1, shaftwidth = self.sphere.radius / 3)#momentum vectors!
         if attached_vec:
             self.momentum_arrow.start()
         else: 
@@ -391,13 +391,15 @@ def click_photon(evt):
 
 # widgets
 start = button(bind = run, text = 'run')
-reset = button(bind = reset, text = 'reset')
 pause = button(bind = pauser, text = 'pause')
+reset = button(bind = reset, text = 'reset')
+wtext(text='   Bohr Model')
+bohr_check = checkbox(bind = bohr_sim)
 spacer = wtext(text='\n')
 frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.0001, value = log_to_linear_freq(freq))
-frequency_text = wtext(text = f'{freq:.4f}\n')
+frequency_text = wtext(text = f'Frequency: {freq:.4f}\n')
 wl_label = wtext(text='')
-click_text = wtext(text='Hold down e and click on the canvas to place electrons.\nHold down a and click to place positrons.\nHold down p and click to place photons. Then run.\n')
+click_text = wtext(text='Hold down e and click on the canvas to place electrons.\nHold down a and click to place positrons.\nHold down p and click to place photons. \nThen run. Objects cannot be placed while running.\n')
 update_wl_label(c/freq)
 wtext(text = 'Attach Momentum Vectors')
 attach_vec_checkbox = checkbox(bind = attach_vec) 
@@ -407,7 +409,7 @@ attach_vec_checkbox = checkbox(bind = attach_vec)
 def change_freq(evt):
     global freq
     freq = linear_to_log_freq(evt.value)
-    frequency_text.text = f'{freq:.4f}\n'
+    frequency_text.text = f'Frequency: {freq:.4f}\n'
     update_wl_label(c/freq)
 
 def reset():
@@ -457,6 +459,9 @@ def attach_vec(evt):
         attached_vec = False 
         for electron in electrons:
             electron.momentum_arrow.stop()
+            
+def bohr_sim():
+    pass
 
 def run():
     global paused, running
@@ -487,6 +492,7 @@ def run():
                     pre_collision_dir = vec(phot.dir.x, phot.dir.y, 0)
 
                     phot.theta = kn_rejacc(phot.E_i)
+                    phot.sign = sign(phot.theta)
                     phot.collision()
                     out_dir = phot.dir
 
