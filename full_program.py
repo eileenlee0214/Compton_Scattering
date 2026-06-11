@@ -169,6 +169,39 @@ def update_wl_label(wl_sim):
     wl_nm = wl_sim * NM_SCALE
     name = classify_photon(wl_nm)
     wl_label.text = f'  lambda = {wl_nm:.3f} nm  [{name}]\n'
+    
+# ======histogram
+dx = 10
+bins = [(i*10 + 5) for i in range(17)]
+hist_freq = [0] * len(bins)
+
+histogram = graph(
+    title = 'Angle Distribution',
+    xtitle = 'Angle',
+    ytitle = 'Frequency',
+    width = 400,
+    height = 300,
+    xmin = 0, xmax = 180,
+    ymin = 0, ymax = 10,
+    align = 'right'
+    )
+    
+hist_bars = gvbars(graph=histogram, color = color.red, delta = dx)
+    
+def update_histogram(angle):
+    global hist_bars, hist_freq
+    angle = angle * 180 / pi
+    bin_index = int(angle / 10)
+    hist_freq[bin_index] += 1
+    data = []
+    for i in range(len(hist_freq)):
+        data.append([bins[i],hist_freq[i]])
+        hist_bars.data = data
+        
+#update_histogram(0)
+    
+
+
 
 #wave packet form
 def dsine(x, freq, phase, dis):
@@ -245,6 +278,9 @@ class photon:
             self.curv.modify(i, pos = rotated + self.ipos)
         self.localtime += dt
         self.pos += rotate(vec(1,0,0), angle = self.sign * diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1)) * dt
+        if mag(self.pos) > 40:
+            self.curv.clear()
+            photons.remove(self)
 
     def collision(self): #calculating energy and updating frequency and electron velocity from conservation of energy and momentum
         self.E_f = self.E_i / (1 + (self.E_i / (m * c**2)) * (1-cos(self.theta)))
@@ -268,7 +304,7 @@ def bohr_radius(n):
     return a0 * n * n
 
 def orbital_speed(n):
-    return 1.0 / (2 * n) # inaccurate but whatever, figure out later
+    return 0.1 / n # inaccurate but whatever, figure out later
 
 class bohr_model:
     def __init__(self):
@@ -341,6 +377,11 @@ class electron:
     def electron_step(self):
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
+        if mag(self.sphere.pos) > 40:
+            self.sphere.visible = False
+            self.momentum_arrow.stop()
+            electrons.remove(self)
+            
 
     def collision(self, in_dir, out_dir, E_i, E_f): #electron direction from conservation of momentum
         p_i = E_i / c * norm(in_dir)
@@ -379,6 +420,10 @@ class positron:
         self.sphere.momentum = self.p
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
+        if mag(self.sphere.pos) > 40:
+            self.sphere.visible = False
+            self.momentum_arrow.stop()
+            positrons.remove(self)
 
     def collision(self, in_dir, out_dir, E_i, E_f): #positron direction from conservation of momentum
         p_i = E_i / c * norm(in_dir)
@@ -469,7 +514,7 @@ update_wl_label(c/freq)
 wtext(text = 'Attach Momentum Vectors')
 attach_vec_checkbox = checkbox(bind = attach_vec) 
 
-# checkbox, set mode
+# checkbox, set model
 
 def change_freq(evt):
     global freq
@@ -481,11 +526,9 @@ def reset():
     global running, photons, electrons, init_Ei, init_iM, orbit_e
     running = False
     runSim.text = 'Run'
-    n = 0
     for phot in photons:
         phot.curv.clear()
-        photons = []
-        n += 1
+    photons.clear()
     for elect in electrons:
         elect.sphere.visible = False
         elect.momentum_arrow.stop()
@@ -495,7 +538,6 @@ def reset():
         orbit_e = orbital_electron(1)
         electrons.append(orbit_e)
         orbit_e.sphere.visible = True
-    
 
     init_Ei = 0
     init_iM = 0
@@ -512,6 +554,8 @@ def reset():
     bar_Mtot.data = []
     update_momenta_graph(h * freq, 0, 0)
     update_wl_label(c/freq)
+    
+    hist_bars.data = []
 
 def change_running(evt):
     global running
@@ -589,6 +633,7 @@ while True:
                     update_energy_graph(phot.init_Ei, phot.E_f, phot.sum_K)
                     update_momenta_graph(phot.init_iM, phot.sum_M_curr_x, phot.sum_eM_x)
                     update_wl_label(phot.wlength)
+                    update_histogram(phot.theta)
 
                     #calculate electrons momentum from photon's momentum
                     #then update the photon's internal time and initial position
@@ -599,7 +644,7 @@ while True:
         for self in electrons:
             for other in electrons:
                 if other is not self:
-                    if mag(other.sphere.pos - self.sphere.pos) < 2 * self.sphere.radius:
+                    if mag(other.sphere.pos - self.sphere.pos) < 2.1 * self.sphere.radius:
                         self.elec_collision(other)
             self.electron_step()
     if running and bohr:
@@ -609,7 +654,7 @@ while True:
                 if not elec.active:
                     continue
                 distance_front = mag(phot.pos + phot.dir - elec.sphere.pos)
-                if distance_front < elec.sphere.radius:
+                if distance_front < 2 * elec.sphere.radius:
 
                     in_dir = phot.dir
 
@@ -646,6 +691,3 @@ while True:
 
         for elec in electrons:
             elec.electron_step()
-
-
-#consolidated it all and added photons, electrons and positron creation and deletion. Positrons not fully integrated
