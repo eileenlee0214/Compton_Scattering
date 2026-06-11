@@ -1,23 +1,21 @@
 Web VPython 3.2
 
 scene.userzoom = False
-scene.range = 10
+scene.range = 15
 scene.autoscale = False
 scene.userspin = False
 
-restart = False
-paused = False
+running = False
+attached_vec = False
+
 freq = 1.0
 
 dl = 0.01
 dt = 0.01
 
-## do add stuff like user choosing the proton's locations
 ## give them option to choose of keep the current configuration
-## pop electron function
 ## histogram
 ## UI
-## if electrons overlaps by a certain amount, make it impossible to place it there
 
 init_Ei = 0
 init_iM = 0
@@ -42,7 +40,7 @@ b4_min = 100.0;    b4_max = 30000.0 # gamma ray
 
 ## pair production: 2.044 MeV
 ## add (M) eV displayer: hc / E = lambda for photons
-
+            
 
 def linear_to_log_freq(t):
     if t < 0.2:
@@ -113,12 +111,14 @@ energy_graph = graph(
     title = 'Conservation of Energy (E = hf)',
     xtitle = 'Bar Graphs',
     ytitle = 'Energy (hf)',
-    width = 450,
+    width = 400,
     height = 300,
-    xmin = 0, xmax = 6,
+    xmin = 0, xmax = 4.5,
     ymin = 0, ymax = 7,
     align = 'right'
 )
+
+
 
 bar_Ei   = gvbars(graph=energy_graph, delta=0.5, color=color.magenta, label='initial energy of photon')
 bar_Ef   = gvbars(graph=energy_graph, delta=0.5, color=color.purple,  label='final energy of photon')
@@ -140,7 +140,7 @@ momenta_graph = graph(
     title = 'Momentum',
     xtitle = 'Bar Graphs',
     ytitle = 'x-direction momenta',
-    width = 450,
+    width = 400,
     height = 300,
     xmin = 0, xmax = 5,
     ymin = -2, ymax = 2,
@@ -175,7 +175,7 @@ def dsine(x, freq, phase, dis):
     return exp(-(x**2)) * sin(freq * (x - dis + phase))
 
 
-def kn_rejacc(Ei): #rejection acceptance method since the pdf is univertible
+def kn_rejacc(Ei): #rejection acceptance method since the pdf from klein nishina is univertible
     g = Ei / (m*c**2) #photon energy per electron rest mass
     def diff_cross(x):
         l_ratio = 1 / (1 + g * (1 - x))#x = cos (theta), change of variables for simplicity, l_ratio is the ration of the incident and outgoing photon wavelengths
@@ -199,13 +199,11 @@ def kn_rejacc(Ei): #rejection acceptance method since the pdf is univertible
     while sampley > diff_cross(samplex) / env:
         samplex = random() * 2 - 1
         sampley = random()
-#    if random() > 0.5:
-#        return -acos(samplex)
-#    else:
-#        return -acos(samplex)
-    return acos(samplex)
-
-
+    if random() > 0.5:
+        return -acos(samplex)
+    else: 
+        return acos(samplex)
+        
 class photon:
     def __init__(self, wlength, ipos, theta):
         self.wlength = wlength
@@ -217,6 +215,8 @@ class photon:
         self.color = freq_to_color(self.freq)
         self.dir = rotate(vec(1,0,0), angle = self.theta, axis = vec(0,0,1))
         self.E_i = h * self.freq
+        self.sign = 1
+        
         self.iM = h / self.wlength
         self.sum_K = 0
         self.sum_eM_x = 0
@@ -231,7 +231,7 @@ class photon:
         for i in range(400):
             dx = (i - 200) * dl
             y = dsine(dx, self.display_freq, 0, self.ipos.x)
-            rotated = rotate(vec(dx, y, 0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
+            rotated = rotate(vec(dx, y, 0), angle = self.sign * diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
             self.curv.append(pos = rotated + self.ipos)
         self.pos = vec(self.ipos.x, self.ipos.y, 0)
 
@@ -241,10 +241,10 @@ class photon:
             dx = (i - 200) * dl
             t = self.localtime * c
             y = dsine(dx, self.display_freq, t, 0)
-            rotated = rotate(vec(dx + t, y, 0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
+            rotated = rotate(vec(dx + t, y, 0), angle = self.sign * diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1))
             self.curv.modify(i, pos = rotated + self.ipos)
         self.localtime += dt
-        self.pos += rotate(vec(1,0,0), angle = diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1)) * dt
+        self.pos += rotate(vec(1,0,0), angle = self.sign * diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1)) * dt
 
     def collision(self): #calculating energy and updating frequency and electron velocity from conservation of energy and momentum
         self.E_f = self.E_i / (1 + (self.E_i / (m * c**2)) * (1-cos(self.theta)))
@@ -264,29 +264,24 @@ class electron:
 
     def create_electron(self):
         self.sphere = sphere(pos=self.position, radius=1, color=color.cyan, momentum = self.p)
-        self.momentum_arrow = attach_arrow(self.sphere, 'momentum', scale = 0.5, shaftwidth = self.sphere.radius / 3)#momentum vectors!
+        self.momentum_arrow = attach_arrow(self.sphere, 'momentum', scale = 1, shaftwidth = self.sphere.radius / 3)#momentum vectors!
         if attached_vec:
             self.momentum_arrow.start()
         else: 
             self.momentum_arrow.stop()
 
-    ## WHY DOES MOMENTUM VECTOR NOT WORK GRRRRRR
     def electron_step(self):
-        self.sphere.momentum = self.p
-        global attached_vec
-        if attached_vec:
-            self.momentum_arrow.start()
-        else: 
-            self.momentum_arrow.stop()
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
-        #print(self.sphere.momentum)
 
     def collision(self, in_dir, out_dir, E_i, E_f): #electron direction from conservation of momentum
         p_i = E_i / c * norm(in_dir)
         p_f = E_f / c * norm(out_dir)
         p_e = p_i - p_f
         self.p += p_e
+        self.sphere.momentum = self.p
+        if attached_vec: 
+            self.momentum_arrow.start()
 
     def elec_collision(self, other):
         n = norm(self.sphere.pos - other.sphere.pos) #normal vector
@@ -295,6 +290,9 @@ class electron:
         J = 0.5 * 2 * (m * p_self_n - m * p_other_n) / (m + m) * n #impulse along normal vector, divided by two since double counted (SHOULD FIX)
         self.p -= J
         other.p += J
+        self.sphere.momentum = self.p
+        if attached_vec: 
+            self.momentum_arrow.start()
         
 class positron:
     def __init__(self, position):
@@ -309,23 +307,18 @@ class positron:
         else: 
             self.momentum_arrow.stop()
 
-    ## WHY DOES MOMENTUM VECTOR NOT WORK GRRRRRR
     def positron_step(self):
         self.sphere.momentum = self.p
-        global attached_vec
-        if attached_vec:
-            self.momentum_arrow.start()
-        else: 
-            self.momentum_arrow.stop()
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
-        #print(self.sphere.momentum)
 
     def collision(self, in_dir, out_dir, E_i, E_f): #positron direction from conservation of momentum
         p_i = E_i / c * norm(in_dir)
         p_f = E_f / c * norm(out_dir)
         p_e = p_i - p_f
         self.p += p_e
+        if attached_vec: 
+            self.momentum_arrow.start()
 
     def posi_collision(self, other):
         n = norm(self.sphere.pos - other.sphere.pos) #normal vector
@@ -334,34 +327,77 @@ class positron:
         J = 0.5 * 2 * (m * p_self_n - m * p_other_n) / (m + m) * n #impulse along normal vector, divided by two since double counted (SHOULD FIX)
         self.p -= J
         other.p += J
+        if attached_vec: 
+            self.momentum_arrow.start()
 
-#making electrons
+#making electrons, photons, and positrons
 electrons = []
 positrons = []
+photons = []
+bohr_electrons = []
 
 scene.bind('click', click_electron)
 
 def click_electron(evt):
-    e = electron(vec(evt.pos.x, evt.pos.y, 0))
-    e.create_electron()
-    electrons.append(e)
+    for elect in electrons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < elect.sphere.radius and not running:
+            elect.sphere.visible = False
+            elect.momentum_arrow.stop()
+    keys = keysdown()
+    if running or 'e' not in keysdown():
+        return None
+    inside = False
+    for elect in electrons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < 1.8 * elect.sphere.radius and not running:
+            inside = True
+    if inside == False:
+        e = electron(vec(evt.pos.x, evt.pos.y, 0))
+        e.create_electron()
+        electrons.append(e)
+        
+scene.bind('click', click_positron)
 
-#making test photons
-photons = []
-for i in range(10):
-    p = photon(c/freq, vec(-10, 2*(i - 5), 0), 0)
-    p.create_photon()
-    photons.append(p)
+def click_positron(evt):
+    for posi in positrons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - posi.sphere.pos) < posi.sphere.radius:
+            posi.sphere.visible = False
+            posi.momentum_arrow.stop()
+    keys = keysdown()
+    if running or 'p' in keysdown() or 'a' not in keysdown():
+        return None
+    inside = False
+    for posi in positrons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - posi.sphere.pos) < 1.8 * posi.sphere.radius:
+            inside = True
+    if inside == False:
+        p = positron(vec(evt.pos.x, evt.pos.y, 0))
+        p.create_positron()
+        positrons.append(p)
+        
+scene.bind('click', click_photon)
+
+def click_photon(evt):
+    for phot in photons:
+        if mag(vec(evt.pos.x, evt.pos.y, 0) - phot.pos) < 1 and not paused:
+            phot.curv.clear()
+    if running:
+        return None
+    keys = keysdown()
+    if 'p' in keys:
+        p = photon(c/freq, vec(evt.pos.x, evt.pos.y, 0), 0)
+        p.create_photon()
+        photons.append(p) 
 
 # widgets
-start = button(bind = run, text = 'run')
+runSim = button(bind = change_running, text = 'Run')
 reset = button(bind = reset, text = 'reset')
-pause = button(bind = pauser, text = 'pause')
+wtext(text='   Bohr Model')
+bohr_check = checkbox(bind = bohr_sim)
 spacer = wtext(text='\n')
 frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.0001, value = log_to_linear_freq(freq))
-frequency_text = wtext(text = f'{freq:.4f}\n')
-click_text = wtext(text='Click on the canvas to place electrons, and then run')
+frequency_text = wtext(text = f'Frequency: {freq:.4f}\n')
 wl_label = wtext(text='')
+click_text = wtext(text='Hold down e and click on the canvas to place electrons.\nHold down a and click to place positrons.\nHold down p and click to place photons. \nThen run. Objects cannot be placed while running.\n')
 update_wl_label(c/freq)
 wtext(text = 'Attach Momentum Vectors')
 attach_vec_checkbox = checkbox(bind = attach_vec) 
@@ -371,23 +407,20 @@ attach_vec_checkbox = checkbox(bind = attach_vec)
 def change_freq(evt):
     global freq
     freq = linear_to_log_freq(evt.value)
-    frequency_text.text = f'{freq:.4f}\n'
+    frequency_text.text = f'Frequency: {freq:.4f}\n'
     update_wl_label(c/freq)
 
 def reset():
-    global restart, photons, electrons, init_Ei, init_iM
-    restart = True
+    global running, photons, electrons, init_Ei, init_iM
     running = False
     n = 0
     for phot in photons:
         phot.curv.clear()
-        photons[n] = photon(c/freq, vec(-10, 2*(n - 5), 0), 0)
-        photons[n].create_photon()
+        photons = []
         n += 1
     for elect in electrons:
         elect.sphere.visible = False
         elect.momentum_arrow.stop()
-        del elect
     electrons = []
 
     init_Ei = 0
@@ -406,22 +439,33 @@ def reset():
     update_momenta_graph(h * freq, 0, 0)
     update_wl_label(c/freq)
 
-def pauser():
-    global paused
-    paused = True
+def change_running(evt):
+    global running
+    if running:
+        running = False
+        runSim.text = 'Start'
+    else: 
+        running = True
+        runSim.text = 'Stop'
     
 def attach_vec(evt):
     global attached_vec
+    global electrons
     if evt.checked:
         attached_vec = True
+        for electron in electrons:
+            electron.momentum_arrow.start()
     else: 
-        attached_vec = False
+        attached_vec = False 
+        for electron in electrons:
+            electron.momentum_arrow.stop()
+            
+def bohr_sim():
+    pass
 
-def run():
-    global paused
-    paused = False
-    while True:
-        rate(1000)
+while True:
+    rate(1000)
+    if running:
         for phot in photons:
             phot.photon_step()
             for elect in electrons:
@@ -442,6 +486,7 @@ def run():
                     pre_collision_dir = vec(phot.dir.x, phot.dir.y, 0)
 
                     phot.theta = kn_rejacc(phot.E_i)
+                    phot.sign = sign(phot.theta)
                     phot.collision()
                     out_dir = phot.dir
 
@@ -470,8 +515,6 @@ def run():
                     if mag(other.sphere.pos - self.sphere.pos) < 2 * self.sphere.radius:
                         self.elec_collision(other)
             self.electron_step()
-        if restart == True:
-            restart = False
-            break
-        if paused == True:
-            break
+
+
+#consolidated it all and added photons, electrons and positron creation and deletion. Positrons not fully integrated
