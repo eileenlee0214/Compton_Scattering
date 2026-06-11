@@ -13,10 +13,6 @@ freq = 1.0
 dl = 0.01
 dt = 0.01
 
-## give them option to choose of keep the current configuration
-## histogram
-## UI
-
 init_Ei = 0
 init_iM = 0
 
@@ -197,11 +193,8 @@ def update_histogram(angle):
     for i in range(len(hist_freq)):
         data.append([bins[i],hist_freq[i]])
         hist_bars.data = data
-        
-#update_histogram(0)
-    
 
-
+#====Photon math and class
 
 #wave packet form
 def dsine(x, freq, phase, dis):
@@ -298,7 +291,7 @@ class photon:
 bohr = False
 
 # Hydrogen atom: single shell (n=1)
-a0 = 6.0 # in reality: 5.292 * pow(10, -11)
+a0 = 2.0 # in reality: 5.292 * pow(10, -11)
 
 def bohr_radius(n):
     return a0 * n * n
@@ -333,7 +326,7 @@ class orbital_electron:
         self.active = True
         x = self.radius * cos(self.angle)
         y = self.radius * sin(self.angle)
-        self.sphere = sphere(pos=vec(x, y, 0), radius=0.5, color=color.cyan)
+        self.sphere = sphere(pos=vec(x, y, 0), radius=0.3, color=color.cyan)
 
     def electron_step(self):
         if self.active:
@@ -447,7 +440,8 @@ class positron:
 electrons = []
 positrons = []
 photons = []
-
+atom =  None
+orbit_e = None
 scene.bind('click', click_electron)
 
 def click_electron(evt):
@@ -466,25 +460,6 @@ def click_electron(evt):
         e = electron(vec(evt.pos.x, evt.pos.y, 0))
         e.create_electron()
         electrons.append(e)
-        
-scene.bind('click', click_positron)
-
-def click_positron(evt):
-    for posi in positrons:
-        if mag(vec(evt.pos.x, evt.pos.y, 0) - posi.sphere.pos) < posi.sphere.radius:
-            posi.sphere.visible = False
-            posi.momentum_arrow.stop()
-    keys = keysdown()
-    if running or 'p' in keysdown() or 'a' not in keysdown() or bohr:
-        return None
-    inside = False
-    for posi in positrons:
-        if mag(vec(evt.pos.x, evt.pos.y, 0) - posi.sphere.pos) < 1.8 * posi.sphere.radius:
-            inside = True
-    if inside == False:
-        p = positron(vec(evt.pos.x, evt.pos.y, 0))
-        p.create_positron()
-        positrons.append(p)
         
 scene.bind('click', click_photon)
 
@@ -509,7 +484,7 @@ spacer = wtext(text='\n')
 frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.0001, value = log_to_linear_freq(freq))
 frequency_text = wtext(text = f'Frequency: {freq:.4f}\n')
 wl_label = wtext(text='')
-click_text = wtext(text='Hold down e and click on the canvas to place electrons.\nHold down a and click to place positrons.\nHold down p and click to place photons. \nThen run. Objects cannot be placed while running.\n')
+click_text = wtext(text='Hold down e and click on the canvas to place electrons.\nHold down p and click to place photons. \nThen run. Objects cannot be placed while running.\n')
 update_wl_label(c/freq)
 wtext(text = 'Attach Momentum Vectors')
 attach_vec_checkbox = checkbox(bind = attach_vec) 
@@ -523,7 +498,7 @@ def change_freq(evt):
     update_wl_label(c/freq)
 
 def reset():
-    global running, photons, electrons, init_Ei, init_iM, orbit_e
+    global running, photons, electrons, init_Ei, init_iM, orbit_e, atom
     running = False
     runSim.text = 'Run'
     for phot in photons:
@@ -533,11 +508,16 @@ def reset():
         elect.sphere.visible = False
         elect.momentum_arrow.stop()
     electrons.clear()
+    atom.nucleus.visible = False
+    atom.c_ring.clear()
     
     if bohr:
+        atom = bohr_model()
+        atom.create_nucleus()
+        atom.create_rings(bohr_radius(1))
         orbit_e = orbital_electron(1)
         electrons.append(orbit_e)
-        orbit_e.sphere.visible = True
+        
 
     init_Ei = 0
     init_iM = 0
@@ -644,7 +624,7 @@ while True:
         for self in electrons:
             for other in electrons:
                 if other is not self:
-                    if mag(other.sphere.pos - self.sphere.pos) < 2.1 * self.sphere.radius:
+                    if mag(other.sphere.pos - self.sphere.pos) < self.sphere.radius:
                         self.elec_collision(other)
             self.electron_step()
     if running and bohr:
