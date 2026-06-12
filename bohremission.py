@@ -598,8 +598,6 @@ def reset():
         for be in belectrons:
             be.sphere.visible = False
         belectrons.clear()
-        orbit_e = orbital_electron(1)
-        belectrons.append(orbit_e)
         
     init_Ei = 0
     init_iM = 0
