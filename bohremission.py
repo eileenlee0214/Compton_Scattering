@@ -598,12 +598,9 @@ def reset():
         for be in belectrons:
             be.sphere.visible = False
         belectrons.clear()
-        for i in range(6):
-            orbit_e = orbital_electron(i+1)
-            belectrons.append(orbit_e)
+        orbit_e = orbital_electron(1)
+        belectrons.append(orbit_e)
         
-            
-
     init_Ei = 0
     init_iM = 0
 
@@ -655,7 +652,7 @@ def bohr_sim(evt):
             elect.sphere.visible = False
             elect.momentum_arrow.stop()
         electrons.clear()
-        
+
         
         bohr = True
         scene.userzoom = True
@@ -676,8 +673,6 @@ def bohr_sim(evt):
             r.clear()
         rings.clear()
         
-        
-
 while True:
     rate(1000)
     if running and not bohr:
