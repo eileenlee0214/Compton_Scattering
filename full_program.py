@@ -278,6 +278,9 @@ class photon:
         if mag(self.pos) > 40 and not bohr:
             self.curv.clear()
             photons.remove(self)
+        elif mag(self.pos) > 60 and bohr:
+            self.curv.clear()
+            photons.remove(self)
 
     def collision(self): #calculating energy and updating frequency and electron velocity from conservation of energy and momentum
         self.E_f = self.E_i / (1 + (self.E_i / (m * c**2)) * (1-cos(self.theta)))
@@ -295,7 +298,7 @@ class photon:
 bohr = False
 
 # Hydrogen atom: single shell (n=1)
-a0 = 2.0 # in reality: 5.292 * pow(10, -11)
+a0 = 1.0 # in reality: 5.292 * pow(10, -11)
 
 def bohr_radius(n):
     return a0 * n * n
@@ -342,6 +345,10 @@ class orbital_electron:
         else:
             if mag(self.p) != 0:
                 self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
+            if mag(self.sphere.pos) > 60:
+                self.sphere.visible = False
+                #self.momentum_arrow.stop()
+                belectrons.remove(self)
 
     def collision(self, in_dir, out_dir, E_i, E_f):
         p_i = E_i / c * norm(in_dir)
@@ -375,7 +382,7 @@ class electron:
     def electron_step(self):
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
-        if mag(self.sphere.pos) > 40 and not bohr:
+        if mag(self.sphere.pos) > 40:
             self.sphere.visible = False
             self.momentum_arrow.stop()
             electrons.remove(self)
@@ -453,9 +460,7 @@ orbit_e = None
 scene.bind('click', clicky)
         
 def clicky(evt):
-    if running:
-        return None
-    if electron_mode:
+    if electron_mode and not running:
         if bohr:
             return None
         for elect in electrons:
@@ -481,6 +486,9 @@ def clicky(evt):
 # widgets
 runSim = button(bind = change_running, text = 'Run')
 reset = button(bind = reset, text = 'reset')
+wtext(text='                                      Bohr Model')
+bohr_check = checkbox(bind = bohr_sim)
+wtext(text = '\n\n')
 place_electrons = button(text='Place electrons', bind = electron_button)
 
 spacer = wtext(text='\n')
@@ -491,8 +499,7 @@ update_wl_label(c/freq)
 wtext(text = 'Attach Momentum Vectors')
 attach_vec_checkbox = checkbox(bind = attach_vec) 
 
-wtext(text='   Bohr Model')
-bohr_check = checkbox(bind = bohr_sim)
+
 
 # checkbox, set model
 
@@ -514,7 +521,7 @@ def change_freq(evt):
 def reset():
     global running, photons, electrons, init_Ei, init_iM, atom, belectrons
     running = False
-    runSim.text = 'Run'
+    runSim.text = 'Start'
     for phot in photons:
         phot.curv.clear()
     photons.clear()
@@ -575,6 +582,17 @@ def attach_vec(evt):
 def bohr_sim(evt):
     global bohr, atom, rings, belectrons
     if evt.checked:
+        running = False
+        runSim.text = 'Start'
+        for phot in photons:
+            phot.curv.clear()
+        photons.clear()
+        for elect in electrons:
+            elect.sphere.visible = False
+            elect.momentum_arrow.stop()
+        electrons.clear()
+        
+        
         bohr = True
         scene.userzoom = True
         atom = bohr_model()
@@ -654,11 +672,11 @@ while True:
     if running and bohr:
         for phot in photons:
             phot.photon_step()
-            for elec in electrons:
-                if not elec.active:
+            for belec in belectrons:
+                if not belec.active:
                     continue
-                distance_front = mag(phot.pos + phot.dir - elec.sphere.pos)
-                if distance_front < 2 * elec.sphere.radius:
+                distance_front = mag(phot.pos + phot.dir - belec.sphere.pos)
+                if distance_front < 2 * belec.sphere.radius:
 
                     in_dir = phot.dir
 
@@ -688,8 +706,8 @@ while True:
                     update_momenta_graph(phot.init_iM, phot.sum_M_curr_x, phot.sum_eM_x)
                     update_wl_label(phot.wlength)
 
-                    elec.collision(in_dir, out_dir, phot.E_i, phot.E_f)
-                    phot.ipos = elec.sphere.pos + phot.dir
+                    belec.collision(in_dir, out_dir, phot.E_i, phot.E_f)
+                    phot.ipos = belec.sphere.pos + phot.dir
                     phot.pos = vec(phot.ipos.x, phot.ipos.y, 0)
                     phot.E_i = h * phot.freq
 
