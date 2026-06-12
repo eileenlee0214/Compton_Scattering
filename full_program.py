@@ -7,6 +7,7 @@ scene.userspin = False
 
 running = False
 attached_vec = False
+electron_mode = True
 
 freq = 1.0
 
@@ -173,7 +174,7 @@ hist_freq = [0] * len(bins)
 
 histogram = graph(
     title = 'Angle Distribution',
-    xtitle = 'Angle',
+    xtitle = 'Angle(degrees)',
     ytitle = 'Frequency',
     width = 400,
     height = 300,
@@ -193,6 +194,9 @@ def update_histogram(angle):
     for i in range(len(hist_freq)):
         data.append([bins[i],hist_freq[i]])
         hist_bars.data = data
+        
+update_histogram(0)
+hist_bars.data = []
 
 #====Photon math and class
 
@@ -271,7 +275,7 @@ class photon:
             self.curv.modify(i, pos = rotated + self.ipos)
         self.localtime += dt
         self.pos += rotate(vec(1,0,0), angle = self.sign * diff_angle(self.dir,vec(1,0,0)), axis = vec(0,0,1)) * dt
-        if mag(self.pos) > 40:
+        if mag(self.pos) > 40 and not bohr:
             self.curv.clear()
             photons.remove(self)
 
@@ -304,7 +308,7 @@ class bohr_model:
         pass
     
     def create_nucleus(self):
-        self.nucleus = nucleus = sphere(pos=vec(0,0,0), radius=0.4, color=color.red, emissive=True)
+        self.nucleus = sphere(pos=vec(0,0,0), radius=0.4, color=color.red, emissive=True)
         
     def create_rings(self,radius):
         pts = []
@@ -315,6 +319,7 @@ class bohr_model:
         self.c_ring = curve(color=vec(0.3, 0.3, 0.3))
         for pt in pts:
             self.c_ring.append(pos=pt)
+        return self.c_ring
 
 class orbital_electron:
     def __init__(self, shell):
@@ -370,7 +375,7 @@ class electron:
     def electron_step(self):
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
-        if mag(self.sphere.pos) > 40:
+        if mag(self.sphere.pos) > 40 and not bohr:
             self.sphere.visible = False
             self.momentum_arrow.stop()
             electrons.remove(self)
@@ -413,7 +418,7 @@ class positron:
         self.sphere.momentum = self.p
         if mag(self.p) != 0:
             self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
-        if mag(self.sphere.pos) > 40:
+        if mag(self.sphere.pos) > 40 and not bohr:
             self.sphere.visible = False
             self.momentum_arrow.stop()
             positrons.remove(self)
@@ -439,57 +444,66 @@ class positron:
 #making electrons, photons, and positrons
 electrons = []
 positrons = []
+belectrons = []
+rings = []
 photons = []
 atom =  None
 orbit_e = None
-scene.bind('click', click_electron)
-
-def click_electron(evt):
-    for elect in electrons:
-        if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < elect.sphere.radius and not running:
-            elect.sphere.visible = False
-            elect.momentum_arrow.stop()
-    keys = keysdown()
-    if running or 'e' not in keysdown() or bohr:
-        return None
-    inside = False
-    for elect in electrons:
-        if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < 1.8 * elect.sphere.radius and not running:
-            inside = True
-    if inside == False:
-        e = electron(vec(evt.pos.x, evt.pos.y, 0))
-        e.create_electron()
-        electrons.append(e)
         
-scene.bind('click', click_photon)
-
-def click_photon(evt):
-    for phot in photons:
-        if mag(vec(evt.pos.x, evt.pos.y, 0) - phot.pos) < 1 and not running:
-            phot.curv.clear()
+scene.bind('click', clicky)
+        
+def clicky(evt):
     if running:
         return None
-    keys = keysdown()
-    if 'p' in keys:
+    if electron_mode:
+        if bohr:
+            return None
+        for elect in electrons:
+            if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < elect.sphere.radius:
+                elect.sphere.visible = False
+                elect.momentum_arrow.stop()
+        inside = False
+        for elect in electrons:
+            if mag(vec(evt.pos.x, evt.pos.y, 0) - elect.sphere.pos) < 1.8 * elect.sphere.radius:
+                inside = True
+        if inside == False:
+            e = electron(vec(evt.pos.x, evt.pos.y, 0))
+            e.create_electron()
+            electrons.append(e)
+    else: 
+        for phot in photons:
+            if mag(vec(evt.pos.x, evt.pos.y, 0) - phot.pos) < 1:
+                phot.curv.clear()
         p = photon(c/freq, vec(evt.pos.x, evt.pos.y, 0), 0)
         p.create_photon()
         photons.append(p) 
-
+                
 # widgets
 runSim = button(bind = change_running, text = 'Run')
 reset = button(bind = reset, text = 'reset')
-wtext(text='   Bohr Model')
-bohr_check = checkbox(bind = bohr_sim)
+place_electrons = button(text='Place electrons', bind = electron_button)
+
 spacer = wtext(text='\n')
 frequency = slider(bind = change_freq, min = 0, max = 1, step = 0.0001, value = log_to_linear_freq(freq))
 frequency_text = wtext(text = f'Frequency: {freq:.4f}\n')
 wl_label = wtext(text='')
-click_text = wtext(text='Hold down e and click on the canvas to place electrons.\nHold down p and click to place photons. \nThen run. Objects cannot be placed while running.\n')
 update_wl_label(c/freq)
 wtext(text = 'Attach Momentum Vectors')
 attach_vec_checkbox = checkbox(bind = attach_vec) 
 
+wtext(text='   Bohr Model')
+bohr_check = checkbox(bind = bohr_sim)
+
 # checkbox, set model
+
+def electron_button(evt):
+    global electron_mode
+    if electron_mode:
+        electron_mode = False
+        place_electrons.text = 'Place photons'
+    else:
+        electron_mode = True
+        place_electrons.text = 'Place electrons'
 
 def change_freq(evt):
     global freq
@@ -498,7 +512,7 @@ def change_freq(evt):
     update_wl_label(c/freq)
 
 def reset():
-    global running, photons, electrons, init_Ei, init_iM, orbit_e, atom
+    global running, photons, electrons, init_Ei, init_iM, atom, belectrons
     running = False
     runSim.text = 'Run'
     for phot in photons:
@@ -508,16 +522,16 @@ def reset():
         elect.sphere.visible = False
         elect.momentum_arrow.stop()
     electrons.clear()
-    atom.nucleus.visible = False
-    atom.c_ring.clear()
     
     if bohr:
-        atom = bohr_model()
-        atom.create_nucleus()
-        atom.create_rings(bohr_radius(1))
-        orbit_e = orbital_electron(1)
-        electrons.append(orbit_e)
+        for be in belectrons:
+            be.sphere.visible = False
+        belectrons.clear()
+        for i in range(6):
+            orbit_e = orbital_electron(i+1)
+            belectrons.append(orbit_e)
         
+            
 
     init_Ei = 0
     init_iM = 0
@@ -559,20 +573,30 @@ def attach_vec(evt):
             electron.momentum_arrow.stop()
             
 def bohr_sim(evt):
-    global bohr, atom, orbit_e
+    global bohr, atom, rings, belectrons
     if evt.checked:
         bohr = True
+        scene.userzoom = True
         atom = bohr_model()
         atom.create_nucleus()
-        atom.create_rings(bohr_radius(1))
-        orbit_e = orbital_electron(1)
-        electrons.append(orbit_e)
+        for i in range(6):
+            ring = atom.create_rings(bohr_radius(i+1))
+            rings.append(ring)
+            orbit_e = orbital_electron(i+1)
+            belectrons.append(orbit_e)
     else: 
         bohr = False
+        scene.userzoom = False
+        scene.range = 15
         atom.nucleus.visible = False
-        orbit_e.sphere.visible = False
-        atom.c_ring.clear()
-        electrons.remove(orbit_e)
+        for be in belectrons:
+            be.sphere.visible = False
+        belectrons.clear()
+        for r in rings:
+            r.clear()
+        rings.clear()
+        
+        
 
 while True:
     rate(1000)
@@ -624,7 +648,7 @@ while True:
         for self in electrons:
             for other in electrons:
                 if other is not self:
-                    if mag(other.sphere.pos - self.sphere.pos) < self.sphere.radius:
+                    if mag(other.sphere.pos - self.sphere.pos) < 2 * self.sphere.radius:
                         self.elec_collision(other)
             self.electron_step()
     if running and bohr:
@@ -669,5 +693,5 @@ while True:
                     phot.pos = vec(phot.ipos.x, phot.ipos.y, 0)
                     phot.E_i = h * phot.freq
 
-        for elec in electrons:
-            elec.electron_step()
+        for be in belectrons:
+            be.electron_step()
