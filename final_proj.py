@@ -601,7 +601,8 @@ def attach_vec(evt):
         attached_vec = False 
         for electron in electrons:
             electron.momentum_arrow.stop()
-            
+
+## add features for the yellow affected electrons to keep running even after collisions. 
 def bohr_sim(evt):
     global bohr, atom, rings, belectrons, compton, running
     if evt.checked:
