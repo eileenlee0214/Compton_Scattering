@@ -720,7 +720,7 @@ while True:
                     if distance_front < 2 * belec.sphere.radius:
 
                         binding_energy_threshold = 0.003 / (belec.shell ** 2)
-                        if phot.E_i < 0.binding_energy_threshold: 
+                        if phot.E_i < binding_energy_threshold: 
                             continue
 
                         in_dir = phot.dir
