@@ -390,10 +390,7 @@ class orbital_electron:
         else:
             if mag(self.p) != 0:
                 self.sphere.pos += mag(self.p) * c**2 / sqrt((mag(self.p) * c)**2 + (m*c**2)**2) * dt * norm(self.p)
-            if mag(self.sphere.pos) > 60:
-                self.sphere.visible = False
-                if self in belectrons:
-                    belectrons.remove(self)
+            self.sphere.pos += vec(0.1, 0.1, 0)
 
     def collision(self, in_dir, out_dir, E_i, E_f):
         p_i = E_i / c * norm(in_dir)
@@ -601,8 +598,7 @@ def attach_vec(evt):
         attached_vec = False 
         for electron in electrons:
             electron.momentum_arrow.stop()
-
-## add features for the yellow affected electrons to keep running even after collisions. 
+            
 def bohr_sim(evt):
     global bohr, atom, rings, belectrons, compton, running
     if evt.checked:
@@ -714,46 +710,51 @@ while True:
                         self.elec_collision(other)
             self.electron_step()
     if running and bohr:
-        for phot in photons:
-            phot.photon_step()
-            for belec in belectrons:
-                if not belec.active:
-                    continue
-                distance_front = mag(phot.pos + phot.dir - belec.sphere.pos)
-                if distance_front < 2 * belec.sphere.radius:
+            for phot in photons:
+                phot.photon_step()
+                for belec in belectrons:
+                    if not belec.active:
+                        continue 
+                    
+                    distance_front = mag(phot.pos + phot.dir - belec.sphere.pos)
+                    if distance_front < 2 * belec.sphere.radius:
 
-                    in_dir = phot.dir
+                        binding_energy_threshold = 0.003 / (belec.shell ** 2)
+                        if phot.E_i < 0.binding_energy_threshold: 
+                            continue
 
-                    if not phot.init_Ei_set:
-                        phot.init_Ei = phot.E_i
-                        phot.init_iM = phot.iM
-                        phot.init_Ei_set = True
-                        phot.init_iM_set = True
+                        in_dir = phot.dir
 
-                    pre_collision_M = h / phot.wlength
-                    pre_collision_dir = vec(phot.dir.x, phot.dir.y, 0)
+                        if not phot.init_Ei_set:
+                            phot.init_Ei = phot.E_i
+                            phot.init_iM = phot.iM
+                            phot.init_Ei_set = True
+                            phot.init_iM_set = True
 
-                    phot.theta = kn_rejacc(phot.E_i)
-                    phot.collision()
-                    out_dir = phot.dir
+                        pre_collision_M = h / phot.wlength
+                        pre_collision_dir = vec(phot.dir.x, phot.dir.y, 0)
 
-                    phot.sum_K += phot.K
+                        phot.theta = kn_rejacc(phot.E_i)
+                        phot.collision()
+                        out_dir = phot.dir
 
-                    p_i_vec = pre_collision_M * norm(pre_collision_dir)
-                    p_f_vec = phot.M * norm(out_dir)
-                    p_e_vec = p_i_vec - p_f_vec
+                        phot.sum_K += phot.K
 
-                    phot.sum_eM_x += p_e_vec.x
-                    phot.sum_M_curr_x = p_f_vec.x
+                        p_i_vec = pre_collision_M * norm(pre_collision_dir)
+                        p_f_vec = phot.M * norm(out_dir)
+                        p_e_vec = p_i_vec - p_f_vec
 
-                    update_energy_graph(phot.init_Ei, phot.E_f, phot.sum_K)
-                    update_momenta_graph(phot.init_iM, phot.sum_M_curr_x, phot.sum_eM_x)
-                    update_wl_label(phot.wlength)
+                        phot.sum_eM_x += p_e_vec.x
+                        phot.sum_M_curr_x = p_f_vec.x
 
-                    belec.collision(in_dir, out_dir, phot.E_i, phot.E_f)
-                    phot.ipos = belec.sphere.pos + phot.dir
-                    phot.pos = vec(phot.ipos.x, phot.ipos.y, 0)
-                    phot.E_i = h * phot.freq
+                        update_energy_graph(phot.init_Ei, phot.E_f, phot.sum_K)
+                        update_momenta_graph(phot.init_iM, phot.sum_M_curr_x, phot.sum_eM_x)
+                        update_wl_label(phot.wlength)
 
-        for be in belectrons:
-            be.electron_step()
+                        belec.collision(in_dir, out_dir, phot.E_i, phot.E_f)
+                        phot.ipos = belec.sphere.pos + phot.dir
+                        phot.pos = vec(phot.ipos.x, phot.ipos.y, 0)
+                        phot.E_i = h * phot.freq
+
+            for be in belectrons:
+                be.electron_step()
